@@ -73,7 +73,7 @@ class CeneoCrawler(object):
         count = 0
         while not self.opinions_crawler.opinions_queue.empty():
             opinion = self.opinions_crawler.opinions_queue.get()
-            utils.append_row_to_csv('ceneo.csv', opinion)
+            utils.append_row_to_csv('ceneo_negative.csv', opinion)
             count += 1
 
         utils.logger.info(f'Fetched {count} opinions')
@@ -148,14 +148,11 @@ class CrawlProducts(object):
             self.all_products = pickle.load(open('all_products.pkl', 'rb'))
 
     def find_products(self):
-        urls = self.browser.find_elements_by_xpath('//a')
-        urls = [url.get_attribute('href') for url in urls if url.get_attribute('href')]
-
-        subpage_regex = re.compile(r"(https://www\.ceneo\.pl\/\d+)(?:[^\dA-Za-z_-]|$)")
-
-        for url in urls:
-            if match := re.search(subpage_regex, url):
-                url = match.group(1)
+        products = self.browser.find_elements_by_xpath('//span[@class="prod-review__stars"]')
+        for product in products:
+            url = product.find_element_by_xpath('.//a').get_attribute('href')
+            rate = product.find_element_by_xpath('.//span[@class="product-score"]').text
+            if float(rate.replace(',', '.')) < 4:
                 if url not in self.all_products:
                     self.all_products.add(url)
                     self.products_queue.put(url)
@@ -229,6 +226,8 @@ class CrawlOpinions(object):
             self.scroll.scroll_down_once()
             next_page_button.click()
             return True
+        except ElementNotInteractableException:
+            return False
 
 
 def save_object_every_minute(object_to_save, filename):
